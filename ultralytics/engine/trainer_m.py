@@ -170,7 +170,7 @@ class RankAllocator(object):
                     self.exp_avg_ipt[n] = torch.zeros_like(p) 
                     self.exp_avg_unc[n] = torch.zeros_like(p) 
                 with torch.no_grad():
-                    # 检查梯度是否存在
+                    # Check if gradient exists
                     if p.grad is None:
                         continue
                     
@@ -180,7 +180,7 @@ class RankAllocator(object):
                     else:
                         ipt_value = (p.grad).abs().detach()
                     
-                    # 检查是否有 NaN
+                    # Check for NaN
                     if torch.any(torch.isnan(ipt_value)):
                         continue
                     

@@ -253,7 +253,7 @@ class BaseModel_m(nn.Module):
         Returns:
             (torch.Tensor): The last output of the model.
         """
-        # 保存原始输入用于分支管理
+        # Save original inputs for branch management
         x_rgb_orig = x_rgb
         x_ir_orig = x_ir
         
@@ -316,7 +316,7 @@ class BaseModel_m(nn.Module):
                 if m.f == -4:
                     x = x_ir
                 elif op.eq(m.f, [-1, -1]):
-                    # 关键修改: 始终使用原始输入,用于异质特征提取路径的起点
+                    # Key modification: always use original input for heterogeneous feature extraction path start
                     x = (x_rgb_orig, x_ir_orig)
                 else:
                     x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]  # from earlier layers
@@ -1187,7 +1187,7 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
             c2 = ch[f[0]]
             args = [c2]
         elif m in (Add_RGB, Add_IR):
-            # Add_RGB/IR: 从 tuple 中提取对应分支并相加
+            # Add_RGB/IR: extract corresponding branch from tuple and add
             if type(f) == int:
                 c2 = ch[f]
                 args = [c2]
@@ -1197,27 +1197,27 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
             else:
                 raise TypeError('The channel nums of the two feature maps must be the same.')
         elif m in (Concat_RGB, Concat_IR):
-            # Concat_RGB/IR: 从 tuple 中提取对应分支并拼接
+            # Concat_RGB/IR: extract corresponding branch from tuple and concatenate
             c2 = sum(ch[x] for x in f)
             args = [1]  # dimension
         elif m in (DCN_Offset_Conv, DCN_Warp_RGB, DCN_Warp_IR):
-            # DCN 相关模块
+            # DCN related modules
             c2 = ch[f[0]] if isinstance(f, list) else ch[f]
             args = [c2]
         elif m is PriorExtractor_Multi:
-            # 先验提取模块: 输入 (RGB, IR), 输出三个尺度的先验
+            # Prior extraction module: input (RGB, IR), output three-scale priors
             # args: [c3, c4, c5, sigma, window_size]
-            # 应用width缩放
+            # Apply width scaling
             c3_scaled = make_divisible(min(args[0], max_channels) * width, 8)
-            c4_scaled = make_divisible(min(args[1], max_channels) * width, 8)  
+            c4_scaled = make_divisible(min(args[1], max_channels) * width, 8)
             c5_scaled = make_divisible(min(args[2], max_channels) * width, 8)
-            args = [c3_scaled, c4_scaled, c5_scaled, *args[3:]]  # 更新缩放后的通道数
-            c2 = (c3_scaled, c4_scaled, c5_scaled)  # 输出是嵌套tuple, 但我们用第一个尺度的通道数作为代表
+            args = [c3_scaled, c4_scaled, c5_scaled, *args[3:]]  # Update scaled channel counts
+            c2 = (c3_scaled, c4_scaled, c5_scaled)  # Output is nested tuple; use first scale's channel count as representative
         elif m is Add_Prior:
-            # 先验注入模块: 输入 [F_Het, Prior_Multi], 输出增强的tuple
-            # f[0]是异质特征的索引, f[1]是先验提取模块的索引(通常是0)
-            c2 = ch[f[0]]  # 输出通道数与异质特征相同
-            # args中第一个参数c应该与异质特征通道数一致，但我们不使用它，直接从ch获取
+            # Prior injection module: input [F_Het, Prior_Multi], output enhanced tuple
+            # f[0] is the heterogeneous feature index, f[1] is the prior extractor module index (usually 0)
+            c2 = ch[f[0]]  # Output channel count matches heterogeneous feature
+            # First arg c should match heterogeneous feature channel count; not used directly, obtained from ch
             args = [ch[f[0]], args[1]] if len(args) > 1 else [ch[f[0]], 0]  # [c, scale_index]
         else:
             c2 = ch[f]

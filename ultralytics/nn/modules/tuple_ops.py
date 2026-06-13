@@ -1,5 +1,5 @@
 """
-Tuple 操作模块: 用于处理 (RGB, IR) tuple 的 Add 和 Concat 操作
+Tuple operation modules: Add and Concat operations for (RGB, IR) tuples
 """
 
 import torch
@@ -14,78 +14,78 @@ __all__ = (
 
 
 class Add_RGB(nn.Module):
-    """从 tuple 中提取 RGB 分支并相加"""
+    """Extract RGB branch from tuple and add"""
     def __init__(self, c):
         super().__init__()
         self.c = c
-    
+
     def forward(self, x):
         """
-        输入: [tensor1, tuple2] 或 [tensor1, tensor2]
-        - tensor1: 单个张量 (如 FPN_P3_RGB)
-        - tuple2: (RGB, IR) tuple (如 F_Het from L14) 或单个张量
-        输出: tensor1 + tuple2[0] (如果是 tuple) 或 tensor1 + tuple2
+        Input: [tensor1, tuple2] or [tensor1, tensor2]
+        - tensor1: single tensor (e.g., FPN_P3_RGB)
+        - tuple2: (RGB, IR) tuple (e.g., F_Het from L14) or single tensor
+        Output: tensor1 + tuple2[0] (if tuple) or tensor1 + tuple2
         """
         if isinstance(x[1], tuple):
-            return x[0] + x[1][0]  # 取 tuple 的第一个元素 (RGB)
+            return x[0] + x[1][0]  # Take first element of tuple (RGB)
         else:
             return x[0] + x[1]
 
 
 class Add_IR(nn.Module):
-    """从 tuple 中提取 IR 分支并相加"""
+    """Extract IR branch from tuple and add"""
     def __init__(self, c):
         super().__init__()
         self.c = c
-    
+
     def forward(self, x):
         """
-        输入: [tensor1, tuple2] 或 [tensor1, tensor2]
-        - tensor1: 单个张量 (如 FPN_P3_IR)
-        - tuple2: (RGB, IR) tuple (如 F_Het from L14) 或单个张量
-        输出: tensor1 + tuple2[1] (如果是 tuple) 或 tensor1 + tuple2
+        Input: [tensor1, tuple2] or [tensor1, tensor2]
+        - tensor1: single tensor (e.g., FPN_P3_IR)
+        - tuple2: (RGB, IR) tuple (e.g., F_Het from L14) or single tensor
+        Output: tensor1 + tuple2[1] (if tuple) or tensor1 + tuple2
         """
         if isinstance(x[1], tuple):
-            return x[0] + x[1][1]  # 取 tuple 的第二个元素 (IR)
+            return x[0] + x[1][1]  # Take second element of tuple (IR)
         else:
             return x[0] + x[1]
 
 
 class Concat_RGB(nn.Module):
-    """从 tuple 中提取 RGB 分支并拼接"""
+    """Extract RGB branch from tuple and concatenate"""
     def __init__(self, dimension=1):
         super().__init__()
         self.d = dimension
-    
+
     def forward(self, x):
         """
-        输入: list of tensors/tuples
-        输出: 拼接所有 RGB 分支
+        Input: list of tensors/tuples
+        Output: concatenate all RGB branches
         """
         rgb_tensors = []
         for item in x:
             if isinstance(item, tuple):
-                rgb_tensors.append(item[0])  # 取 RGB 分支
+                rgb_tensors.append(item[0])  # Take RGB branch
             else:
-                rgb_tensors.append(item)  # 已经是单个张量
+                rgb_tensors.append(item)  # Already a single tensor
         return torch.cat(rgb_tensors, self.d)
 
 
 class Concat_IR(nn.Module):
-    """从 tuple 中提取 IR 分支并拼接"""
+    """Extract IR branch from tuple and concatenate"""
     def __init__(self, dimension=1):
         super().__init__()
         self.d = dimension
-    
+
     def forward(self, x):
         """
-        输入: list of tensors/tuples
-        输出: 拼接所有 IR 分支
+        Input: list of tensors/tuples
+        Output: concatenate all IR branches
         """
         ir_tensors = []
         for item in x:
             if isinstance(item, tuple):
-                ir_tensors.append(item[1])  # 取 IR 分支
+                ir_tensors.append(item[1])  # Take IR branch
             else:
-                ir_tensors.append(item)  # 已经是单个张量
+                ir_tensors.append(item)  # Already a single tensor
         return torch.cat(ir_tensors, self.d)

@@ -1,179 +1,144 @@
-
 import os
 import xml.etree.ElementTree as ET
 import math
 import cv2 as cv
 import argparse
 from tqdm import tqdm
- 
-# 图像类别  https://zhuanlan.zhihu.com/p/665126340
-classes = [ "car", "truck", "bus", "van", "freight car"]
- 
- 
-# 定义相关地址参数
+
+# Class names
+classes = ["car", "truck", "bus", "van", "freight car"]
+
+
+# Define path arguments
 def parse_args():
-    parser = parser = argparse.ArgumentParser(description='polygon')
-    parser.add_argument('--in_xml_vi_dir', default='/home/data1/yanght/DroneVehicle/train/trainlabel', help='可见光 XML 文件地址')
-    parser.add_argument('--in_xml_ir_dir', default='/home/data1/yanght/DroneVehicle/train/trainlabelr', help='红外光 XML 文件地址')
-    parser.add_argument('--out_vi_txt_dir', default='/home/data1/yanght/DroneVehicle/train/trainlabel', help='可见光 TXT 文件地址')
-    parser.add_argument('--out_ir_txt_dir', default='/home/data1/yanght/DroneVehicle/train/trainlabelr', help='红外光 TXT 文件地址')
-    parser.add_argument('--in_vi_img_dir', default='/home/data1/yanght/DroneVehicle/train/trainimg', help='裁切后的 vi-img 地址')
-    parser.add_argument('--in_ir_img_dir', default='/home/data1/yanght/DroneVehicle/train/trainimgr', help='裁切后的 ir-img 地址')
- 
- 
-    # parser.add_argument('--in_xml_vi_dir', default='/home/data1/yanght/DroneVehicle/val/vallabel', help='可见光 XML 文件地址')
-    # parser.add_argument('--in_xml_ir_dir', default='/home/data1/yanght/DroneVehicle/val/vallabelr', help='红外光 XML 文件地址')
-    # parser.add_argument('--out_vi_txt_dir', default='/home/data1/yanght/DroneVehicle/val/vallabel', help='可见光 TXT 文件地址')
-    # parser.add_argument('--out_ir_txt_dir', default='/home/data1/yanght/DroneVehicle/val/vallabelr', help='红外光 TXT 文件地址')
-    # parser.add_argument('--in_vi_img_dir', default='/home/data1/yanght/DroneVehicle/val/valimg', help='裁切后的 vi-img 地址')
-    # parser.add_argument('--in_ir_img_dir', default='/home/data1/yanght/DroneVehicle/val/valimgr', help='裁切后的 ir-img 地址')
- 
-    # parser.add_argument('--in_xml_vi_dir', default='/home/data1/yanght/DroneVehicle/test/testlabel', help='可见光 XML 文件地址')
-    # parser.add_argument('--in_xml_ir_dir', default='/home/data1/yanght/DroneVehicle/test/testlabelr', help='红外光 XML 文件地址')
-    # parser.add_argument('--out_vi_txt_dir', default='/home/data1/yanght/DroneVehicle/test/testlabel', help='可见光 TXT 文件地址')
-    # parser.add_argument('--out_ir_txt_dir', default='/home/data1/yanght/DroneVehicle/test/testlabelr', help='红外光 TXT 文件地址')
-    # parser.add_argument('--in_vi_img_dir', default='/home/data1/yanght/DroneVehicle/test/testimg', help='裁切后的 vi-img 地址')
-    # parser.add_argument('--in_ir_img_dir', default='/home/data1/yanght/DroneVehicle/test/testimgr', help='裁切后的 ir-img 地址')
- 
+    parser = argparse.ArgumentParser(description='polygon')
+    parser.add_argument('--in_xml_vi_dir', default='/home/data1/yanght/DroneVehicle/train/trainlabel', help='RGB XML file directory')
+    parser.add_argument('--in_xml_ir_dir', default='/home/data1/yanght/DroneVehicle/train/trainlabelr', help='IR XML file directory')
+    parser.add_argument('--out_vi_txt_dir', default='/home/data1/yanght/DroneVehicle/train/trainlabel', help='RGB TXT file directory')
+    parser.add_argument('--out_ir_txt_dir', default='/home/data1/yanght/DroneVehicle/train/trainlabelr', help='IR TXT file directory')
+    parser.add_argument('--in_vi_img_dir', default='/home/data1/yanght/DroneVehicle/train/trainimg', help='Cropped RGB image directory')
+    parser.add_argument('--in_ir_img_dir', default='/home/data1/yanght/DroneVehicle/train/trainimgr', help='Cropped IR image directory')
+
+    # parser.add_argument('--in_xml_vi_dir', default='/home/data1/yanght/DroneVehicle/val/vallabel', help='RGB XML file directory')
+    # parser.add_argument('--in_xml_ir_dir', default='/home/data1/yanght/DroneVehicle/val/vallabelr', help='IR XML file directory')
+    # parser.add_argument('--out_vi_txt_dir', default='/home/data1/yanght/DroneVehicle/val/vallabel', help='RGB TXT file directory')
+    # parser.add_argument('--out_ir_txt_dir', default='/home/data1/yanght/DroneVehicle/val/vallabelr', help='IR TXT file directory')
+    # parser.add_argument('--in_vi_img_dir', default='/home/data1/yanght/DroneVehicle/val/valimg', help='Cropped RGB image directory')
+    # parser.add_argument('--in_ir_img_dir', default='/home/data1/yanght/DroneVehicle/val/valimgr', help='Cropped IR image directory')
+
+    # parser.add_argument('--in_xml_vi_dir', default='/home/data1/yanght/DroneVehicle/test/testlabel', help='RGB XML file directory')
+    # parser.add_argument('--in_xml_ir_dir', default='/home/data1/yanght/DroneVehicle/test/testlabelr', help='IR XML file directory')
+    # parser.add_argument('--out_vi_txt_dir', default='/home/data1/yanght/DroneVehicle/test/testlabel', help='RGB TXT file directory')
+    # parser.add_argument('--out_ir_txt_dir', default='/home/data1/yanght/DroneVehicle/test/testlabelr', help='IR TXT file directory')
+    # parser.add_argument('--in_vi_img_dir', default='/home/data1/yanght/DroneVehicle/test/testimg', help='Cropped RGB image directory')
+    # parser.add_argument('--in_ir_img_dir', default='/home/data1/yanght/DroneVehicle/test/testimgr', help='Cropped IR image directory')
+
     args = parser.parse_args()
     return args
- 
- 
-# 根据 xml 文件中的 name 选择生成的 txt 文件中的 id
-def select_id(name):
-    if name == "car":
-        id = 0
-    elif name == "truck":
-        id = 1
-    elif name == "bus":
-        id = 2
-    elif name == "van":
-        id = 3
-    elif name == "freight car":
-        id = 4
-    return id
- 
- 
-# YOLO 数据处理
-def data_transform(height, width, xmin, ymin, xmax, ymax):
-    # 中心点坐标 x_c,y_c
-    x_c = (xmin + xmax) / 2
-    y_c = (ymin + ymax) / 2
- 
-    # 中心横坐标与图像宽度比值 x_，中心纵坐标与图像高度比值 y_，bbox 宽度与图像宽度比值 w_，bbox 高度与图像高度比值 h_
-    x_ = x_c / width
-    y_ = y_c / height
-    w_ = (xmax - xmin) / width
-    h_ = (ymax - ymin) / height
- 
-    return x_, y_, w_, h_
- 
- 
-# xml 文件转 txt 文件
-def xml2txt(in_xml_dir, xml_name, out_txt_dir, in_img_dir):
-    txt_name = xml_name[:-4] + '.txt'   # 获取生成的 txt 文件名
-    txt_path = out_txt_dir  # 获取生成的 txt 文件保存地址
- 
-    # 判断保存 txt 文件的文件夹是否存在，如果不存在则创建相应文件夹
-    if not os.path.exists(txt_path):
-        os.makedirs(txt_path)
-    txt_file = os.path.join(txt_path, txt_name)     # 获取 txt 文件地址（保存地址 + 保存名字）
- 
-    img_name = xml_name[:-4] + '.jpg'   # 获取图像名字，确保生成的 txt 文件名与图像文件名一致
-    img_path = os.path.join(in_img_dir, img_name)   # 获取图像地址
-    img = cv.imread(img_path)   # 读取图像信息
-    height, width, _ = img.shape    # 获取图像高度（height），宽度（width），通道数（_）
- 
-    xml_file = os.path.join(in_xml_dir, xml_name)   # 获取 xml 文件地址
-    tree = ET.parse(os.path.join(xml_file))     # 使用 ET.parse 方法解析 xml 文件
-    root = tree.getroot()   # 使用 getroot 方法获取根目录
- 
-    # 生成对应的 txt 文件
-    with open(txt_file, "w+", encoding='UTF-8') as out_file:
-        for obj in root.findall('object'):
-            # 修改部分标注文件中标注不全的 name 文件
-            name = obj.find('name').text
-            if name == 'feright_car' or "feright":  # feright car标签名称在xml文件里好乱呀，有的是是feright car，有的是feright有的是feright_car 统一改成freight car
-                name = 'freight car'
-            else:
-                name = name
- 
-            # 从 xml 文件中提取相关数据信息,并进行删除白边数据操作（白边宽度 100 像素）
-            if obj.find('polygon'):
-                # 创建空列表用于存放需要处理的数据
-                xmin, xmax, ymin, ymax = [], [], [], []
-                polygon = obj.find('polygon')
-                # 使用 .find() 方法获取对应 xml 文件中键的键值
-                x1 = int(polygon.find('x1').text) - 100
-                y1 = int(polygon.find('y1').text) - 100
-                x2 = int(polygon.find('x2').text) - 100
-                y2 = int(polygon.find('y2').text) - 100
-                x3 = int(polygon.find('x3').text) - 100
-                y3 = int(polygon.find('y3').text) - 100
-                x4 = int(polygon.find('x4').text) - 100
-                y4 = int(polygon.find('y4').text) - 100
-                # 将获取后的数据填入空列表中
-                for i in [x1, x2, x3, x4]:
-                    xmin.append(i)
-                    xmax.append(i)
-                for j in [y1, y2, y3, y4]:
-                    ymin.append(j)
-                    ymax.append(j)
-                # 使用 min()、max() 方法获取最大值，最小值
-                xmin = min(xmin)
-                xmax = max(xmax)
-                ymin = min(ymin)
-                ymax = max(ymax)
-                # yolo 格式转换
-                result = data_transform(height, width, xmin, ymin, xmax, ymax)
-                # id 选择
-                result_id = select_id(name)
- 
-            elif obj.find('bndbox'):
-                bndbox = obj.find('bndbox')
-                # 使用 .find() 方法获取对应 xml 文件中键的键值
-                xmin = bndbox.find('xmin').text
-                ymin = bndbox.find('ymin').text
-                xmax = bndbox.find('xmax').text
-                ymax = bndbox.find('ymax').text
-                x1 = int(xmin) - 100
-                y1 = int(ymin) - 100
-                x3 = int(xmax) - 100
-                y3 = int(ymax) - 100
-                # yolo 格式转换
-                result = data_transform(height, width, x1, y1, x3, y3)
-                # id 选择
-                result_id = select_id(name)
- 
-            # 创建 txt 文件中的数据
-            # data = str(result[0]) + " " + str(result[1]) + " " + str(result[2]) + " " + str(result[3]) + '\n'
-            # data = str(result_id) + " " + data
-            # out_file.write(data)
- 
-            # 针对于处理图像后出现负值数据的代码修改
-            # 修改思路：在将xml数据转换为txt数据之后，进行一个if条件的判断，如果生成的txt数据有出现负值，则忽略这个数据，否则保存数据
-            if 0 <= result[0] <= 1 and 0 <= result[1] <= 1 and 0 <= result[2] <= 1 and 0 <= result[3] <= 1:
-                data = str(result[0]) + " " + str(result[1]) + " " + str(result[2]) + " " + str(result[3]) + '\n'
-                data = str(result_id) + " " + data
-                out_file.write(data)
-            else:
-                pass
- 
- 
-if __name__ == "__main__":
-    args = parse_args()     # 获取命令参数
-    xml_vi_path = args.in_xml_vi_dir    # 获取可见光 xml 文件地址
-    xmlFiles_vi = os.listdir(xml_vi_path)   # 生成可见光 xml 文件名列表
-    xml_ir_path = args.in_xml_ir_dir    # 获取红外 xml 文件地址
-    xmlFiles_ir = os.listdir(xml_ir_path)   # 生成红外 xml 文件名列表
- 
-    print('Start transforming vision labels...')
-    for i in tqdm(range(0, len(xmlFiles_vi))):
-        xml2txt(args.in_xml_vi_dir, xmlFiles_vi[i], args.out_vi_txt_dir, args.in_vi_img_dir)
-    print('Finish.')
- 
-    print('Start transforming infrared labels...')
-    for i in tqdm(range(0, len(xmlFiles_ir))):
-        xml2txt(args.in_xml_ir_dir, xmlFiles_ir[i], args.out_ir_txt_dir, args.in_ir_img_dir)
-    print('Finish.')
 
+
+def drow_polygon(in_xml_dir, out_txt_dir, in_img_dir):
+    """Draw polygon annotations"""
+    if not os.path.exists(out_txt_dir):
+        os.mkdir(out_txt_dir)
+
+    for obj in tqdm(os.listdir(in_xml_dir)):
+        print(obj)
+
+        tree = ET.parse(os.path.join(in_xml_dir, obj))
+
+        root = tree.getroot()
+
+        size = root.find("size")
+
+        width = size.find("width").text
+        height = size.find("height").text
+        # depth = size.find("depth").text
+
+        file_path = ""
+        img_path = os.path.join(in_img_dir, obj[:-4] + ".jpg")
+
+        image_quality = 1
+        result = {}
+
+        if os.path.exists(img_path):
+            file_path = img_path
+            image_quality = 1
+        else:
+            file_path = os.path.join(in_img_dir, obj[:-4] + ".png")
+
+            if os.path.exists(file_path):
+                image_quality = 1
+            else:
+                image_quality = 0
+
+        with open(os.path.join(out_txt_dir, obj[:-4] + ".txt"), 'w') as f_dst:
+            for obj in root.findall("object"):
+                name = obj.find("name").text
+
+                # difficult = obj.find("difficult").text
+
+                if name not in classes:
+                    continue
+
+                if name in classes:
+                    id = classes.index(name)
+
+                polygon = obj.find("polygon")
+
+                if polygon is None:
+                    continue
+
+                points = polygon.findall("point")
+
+                if points is None:
+                    continue
+
+                pts = [[0 for _ in range(2)] for _ in range(4)]
+
+                for i, point in enumerate(points):
+                    x = float(point.text.split(",")[0])
+                    y = float(point.text.split(",")[1])
+                    pts[i] = [x, y]
+
+                p1, p2, p3, p4 = pts
+                cx = (p1[0] + p2[0] + p3[0] + p4[0]) / 4.0
+                cy = (p1[1] + p2[1] + p3[1] + p4[1]) / 4.0
+
+                if image_quality == 0:
+                    continue
+
+                file_path = ""
+
+                w = int(p2[0] - p1[0])
+                h = int(p4[1] - p3[1])
+
+                cvimg = cv.imread(file_path)
+
+                cvimg_crop = cvimg[int(cy) - h // 2:int(cy) + h // 2, int(cx) - w // 2:int(cx) + w // 2]
+
+                if 0 in cvimg_crop.shape:
+                    continue
+
+                x1 = (p1[0] - (cx - w // 2)) / w
+                y1 = (p1[1] - (cy - h // 2)) / h
+
+                x2 = (p2[0] - (cx - w // 2)) / w
+                y2 = (p2[1] - (cy - h // 2)) / h
+
+                x3 = (p3[0] - (cx - w // 2)) / w
+                y3 = (p3[1] - (cy - h // 2)) / h
+
+                x4 = (p4[0] - (cx - w // 2)) / w
+                y4 = (p4[1] - (cy - h // 2)) / h
+
+                f_dst.write(str(id) + " " + str(x1) + " " + str(y1) + " " + str(x2) + " " + str(y2) + " " + str(x3) + " " + str(y3) + " " + str(x4) + " " + str(y4) + "\n")
+
+
+if __name__ == '__main__':
+    args = parse_args()
+
+    print("RGB Training Data...")
+    drow_polygon(args.in_xml_vi_dir, args.out_vi_txt_dir, args.in_vi_img_dir)
+    print("IR Training Data...")
+    drow_polygon(args.in_xml_ir_dir, args.out_ir_txt_dir, args.in_ir_img_dir)

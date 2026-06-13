@@ -15,7 +15,6 @@ This is the official PyTorch implementation of the CVPR 2026 Findings paper **"C
 - [x] Initial repository setup.
 - [ ] Release core network architecture code (`models/CrossWeaver.py`).
 - [ ] Release training scripts and dataloaders for the DroneVehicle dataset.
-- [ ] Release pre-trained weights.
 - [ ] Provide evaluation instructions.
 
 ## 📖 Abstract
@@ -33,4 +32,8 @@ If you find our work or this code useful in your research, please consider citin
   author    = {Yang, Haitian and Fang, Juan and Zhu, Yiren and others},
   booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) Findings},
   year      = {2026}
-}# CrossWeaver
+}
+
+## 🙏 Acknowledgements
+
+The code is based on YOLOv8 of [Ultralytics](https://github.com/ultralytics/ultralytics). We thank the authors of [LoME](https://github.com/zyszxhy/LoME) and [COMO](https://github.com/luluyuu/COMO) for their prior work that inspired this project.
