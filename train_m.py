@@ -1,7 +1,7 @@
 
 # from ultralytics import YOLO_m
 
-# model = YOLO_m("cvpr.yaml")
+# model = YOLO_m("crossweaver_s.yaml")
 # model.train(data="drone_vehicle_m.yaml",
 #             epochs=50,
 #             patience=30,
@@ -54,7 +54,7 @@
 
 from ultralytics import YOLO_m
 
-model = YOLO_m("cvpr.yaml")
+model = YOLO_m("crossweaver_s.yaml")
 # model.load("./ultralytics/yolov8s.pt")  # load weights
 model.train(data="drone_vehicle_m.yaml",
             epochs=150,

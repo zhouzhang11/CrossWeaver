@@ -1,149 +1,36 @@
-# CrossWeaver
+# CrossWeaver: Towards Efficient Cross-Modal Interweaving and Decoupling for Weakly-Aligned Multispectral Object Detection
 
-> **CrossWeaver: Cross-Modal Feature Weaving with Adaptive LoRA for Aerial Object Detection**
->
-> CVPR 2026
+[![Conference](https://img.shields.io/badge/CVPR-2026-blue.svg)](https://cvpr.thecvf.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
-The official PyTorch implementation of CrossWeaver, a cross-modal (RGB + Infrared) object detection framework that weaves homogeneous and heterogeneous features through Adaptive LoRA and Mamba-based fusion for robust aerial detection.
+This is the official PyTorch implementation of the CVPR 2026 Findings paper **"CrossWeaver: Towards Efficient Cross-Modal Interweaving and Decoupling for Weakly-Aligned Multispectral Object Detection"**.
 
-Built on [Ultralytics YOLOv8](https://github.com/ultralytics/ultralytics).
+> **Note:** The code is currently undergoing internal review and clean-up. We will release the full training and evaluation code, along with the pre-trained weights, before the conference starts. 
 
-## Overview
+## 📢 News / Updates
+* **[2026-04-01]** Our paper has been accepted to **CVPR 2026 Findings**!
+* **[2026-04-01]** Created the repository. The source code and pre-trained models will be released soon.
 
-CrossWeaver addresses the challenge of fusing RGB and infrared (IR) features for aerial object detection. The key idea is to **separate** what is shared (homogeneous) from what is modality-specific (heterogeneous), then adaptively **weave** them back together.
+## 🛠️ TODO List
+- [x] Initial repository setup.
+- [ ] Release core network architecture code (`models/CrossWeaver.py`).
+- [ ] Release training scripts and dataloaders for the DroneVehicle dataset.
+- [ ] Release pre-trained weights.
+- [ ] Provide evaluation instructions.
 
-<div align="center">
-  <img src="docs/architecture.png" width="800"/>
-</div>
+## 📖 Abstract
+While single-modal object detection has made significant progress, real-world perception increasingly depends on multimodal data to capture richer visual cues. However, multimodal object detection under weak spatial alignment remains challenging. In this work, we revisit the problem from two key perspectives: (1) quantization error caused by misaligned multimodal fusion, and (2) balancing modality similarity and complementarity for robust feature integration. Building upon these insights, we propose a novel Cross-Modal Semantic Weaving Network (CrossWeaver) for weakly aligned multimodal object detection. Specifically, we design the Modality-Contrastive Shared Encoder (MCSE) to extract shared semantic representations across modalities under contrastive supervision. Then, we propose the Modality-Conditioned Deformation Adapter (MCDA) to dynamically modulate spatial sampling fields for adaptive geometric transformations and inject lightweight modality-specific priors. Finally, the Cross-Hierarchical Synergistic Network (CHSN) establishes bidirectional interactions between shared semantic and modality-aware features to mitigate quantization errors induced by weak alignment. Extensive experiments show that CrossWeaver achieves state-of-the-art performance on weakly aligned multimodal object detection benchmarks. Our method achieves the $\text{mAP}_{50}$ of 86.8% on DroneVehicle dataset.
 
-### Key components
+## 🚀 Usage (Coming Soon)
+Detailed instructions for environment setup, data preparation, training, and evaluation will be provided here once the code is public.
 
-- **Homogeneous / Heterogeneous Feature Separation** — A dual-path backbone extracts modality-shared (homo) and modality-specific (het) features from RGB–IR pairs, guided by a Prior Extraction module.
-- **Adaptive LoRA (AdaLoRA)** — Symmetric low-rank adaptation with dynamically pruned ranks tailors the pre-trained YOLOv8 backbone to cross-modal inputs without full fine-tuning.
-- **Mamba Fusion** — A state-space model (Mamba) fuses homo features at the deepest level, capturing long-range cross-modal dependencies efficiently.
-- **DCN Alignment** — Deformable convolution warps multi-scale features to handle spatial misalignment between modalities.
-- **Dual Detection Heads** — Separate detection branches for RGB and IR produce the final oriented bounding boxes.
-
-## Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/zhouzhang11/CrossWeaver.git
-cd CrossWeaver
-
-# Install dependencies
-pip install -e .
-pip install einops causal-conv1d mamba-ssm
-```
-
-**Requirements:** Python >= 3.8, PyTorch >= 1.8, CUDA (for Mamba/selective scan kernels)
-
-## Datasets
-
-Download the datasets from their official sources:
-
-| Dataset | Description | Link |
-|---------|-------------|------|
-| DroneVehicle | RGB-IR vehicle detection with OBB | [Download](https://drive.google.com/drive/folders/1v91V7bcr6Hu6gRzDJ1zK7_YKOJdaxaBA) |
-| M3FD | Multi-modal multi-scale fusion detection | [Official]() |
-| DVTOD | Drone-view thermal object detection | [Official]() |
-| VEDAI | Vehicle detection in aerial imagery | [Official]() |
-
-Organize datasets following the Ultralytics YOLO format. Dataset YAML configuration files are in `ultralytics/cfg/datasets/`.
-
-## Quick Start
-
-### Training
-
-Standard YOLOv8 baseline:
-```bash
-python train.py
-```
-
-CrossWeaver (AdaLoRA + Mamba + DCN):
-```bash
-python train_m.py
-```
-
-Key training arguments:
-- `r_init` / `r_target` — Initial and target LoRA ranks for AdaLoRA
-- `adalora` — Enable adaptive rank pruning
-- `data` — Dataset YAML config path
-- `model` — Model config YAML (see `ultralytics/cfg/models/lma/`)
-
-### Validation
-
-```bash
-python val.py          # Standard
-python val_m.py        # CrossWeaver
-python val_shift.py    # Spatial shift robustness evaluation
-```
-
-### Testing
-
-```bash
-bash test.sh                  # Full test suite
-bash test_single_shift.sh     # Single shift test
-```
-
-## Model Zoo
-
-Model configurations are in `ultralytics/cfg/models/lma/`:
-
-| Config | Description |
-|--------|-------------|
-| `cvpr.yaml` | Full CrossWeaver (homo/het paths, AdaLoRA sym, Mamba fusion, DCN) |
-| `yolov8_m.yaml` | YOLOv8 multi-modal variant |
-| `yolov8_lma.yaml` | YOLOv8 with LoRA modules |
-| `yolov8-obb_m.yaml` | OBB variant for oriented detection |
-| `yolov8-obb_lma.yaml` | OBB variant with LoRA |
-| `new.yaml`, `newnew.yaml` | Experimental variants |
-
-## Repository Structure
-
-```
-.
-├── train_m.py                           # CrossWeaver training entry
-├── val_m.py                             # CrossWeaver validation entry
-├── val_shift.py                         # Spatial shift robustness evaluation
-├── train.py / val.py                    # YOLOv8 baseline
-├── convert.py                           # Model conversion utilities
-├── ssm/                                 # Mamba / Selective Scan kernels
-├── ultralytics/
-│   ├── nn/modules/
-│   │   ├── conv_adalora_symmetric_m.py  # AdaLoRA symmetric (multi-modal)
-│   │   ├── conv_adalora_asymmetric_m.py # AdaLoRA asymmetric
-│   │   ├── conv_adalora.py             # AdaLoRA base
-│   │   ├── conv_adalora_homo_het.py    # Homo/het LoRA variants
-│   │   ├── conv_lora.py / conv_lora_m.py
-│   │   ├── conv_all_lora.py / conv_all_lora_m.py
-│   │   └── como_block.py               # Fusion & prior injection blocks
-│   ├── engine/
-│   │   ├── trainer_m.py / validator_m.py
-│   │   ├── adalora_rank_allocator.py    # Adaptive rank pruning
-│   │   └── trainer.py / validator.py
-│   ├── nn/tasks_m.py                    # Multi-modal task definition
-│   └── cfg/models/lma/                  # Model configs
-└── test_modules.py                      # Module-level unit tests
-```
-
-## Citation
-
-If you use CrossWeaver in your research, please cite:
+## 🔗 Citation
+If you find our work or this code useful in your research, please consider citing our paper:
 
 ```bibtex
-@inproceedings{crossweaver2026,
-  title     = {CrossWeaver: Cross-Modal Feature Weaving with Adaptive LoRA for Aerial Object Detection},
-  author    = {},
-  booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
-  year      = {2026},
-}
-```
-
-## License
-
-This project is released under the [AGPL-3.0 License](LICENSE), following the Ultralytics YOLOv8 license.
-
-## Acknowledgements
-
-This codebase is built upon [Ultralytics YOLOv8](https://github.com/ultralytics/ultralytics). The SSM/Mamba kernels are adapted from [Mamba](https://github.com/state-spaces/mamba) by Tri Dao and Albert Gu.
+@inproceedings{yang2026crossweaver,
+  title     = {CrossWeaver: Towards Efficient Cross-Modal Interweaving and Decoupling for Weakly-Aligned Multispectral Object Detection},
+  author    = {Yang, Haitian and Fang, Juan and Zhu, Yiren and others},
+  booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) Findings},
+  year      = {2026}
+}# CrossWeaver
