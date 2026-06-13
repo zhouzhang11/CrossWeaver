@@ -1,0 +1,13 @@
+path: /home/data1/yanght/DVTOD/
+train_rgb: train_ir.txt
+val_rgb: val_ir.txt
+test_rgb: test_ir.txt
+
+train_ir: train_rgb.txt
+val_ir: val_rgb.txt
+test_ir: test_rgb.txt
+
+names:
+  0: person
+  1: car
+  2: bicycle

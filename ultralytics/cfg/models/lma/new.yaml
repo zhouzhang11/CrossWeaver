@@ -1,0 +1,127 @@
+# # Ultralytics YOLO 🚀, AGPL-3.0 license
+# # YOLOv8 Oriented Bounding Boxes (OBB) model with P3-P5 outputs. For Usage examples see https://docs.ultralytics.com/tasks/detect
+
+# # Parameters
+# nc: 80 # number of classes
+# scales: # model compound scaling constants, i.e. 'model=yolov8n.yaml' will call yolov8.yaml with scale 'n'
+#   # [depth, width, adalora_sym_mx_channels]
+#   n: [0.33, 0.25, 1024] # YOLOv8n sumadalora_sym_mry: 225 layers,  3157200 parameters,  3157184 gradients,   8.9 GFLOPs
+#   s: [0.33, 0.50, 1024] # YOLOv8s sumadalora_sym_mry: 225 layers, 11166560 parameters, 11166544 gradients,  28.8 GFLOPs
+#   m: [0.67, 0.75, 768] # YOLOv8m sumadalora_sym_mry: 295 layers, 25902640 parameters, 25902624 gradients,  79.3 GFLOPs
+#   l: [1.00, 1.00, 512] # YOLOv8l sumadalora_sym_mry: 365 layers, 43691520 parameters, 43691504 gradients, 165.7 GFLOPs
+#   x: [1.00, 1.25, 512] # YOLOv8x sumadalora_sym_mry: 365 layers, 68229648 parameters, 68229632 gradients, 258.5 GFLOPs
+
+
+# # YOLOv8.0n backbone
+# backbone:
+#   # [from, number, module, args]
+#     - [-1, 1, Conv, [64, 6, 2, 2]] # 0-P1/2
+#     - [-1, 1, Conv, [128, 3, 2]] # 1-P2/4
+#     - [-1, 3, C2f, [128, True]]
+#     - [-1, 1, Conv, [256, 3, 2]] # 3-P3/8
+#     - [-1, 6, C2f, [256, True]]
+#     - [-1, 1, Conv, [512, 3, 2]] # 5-P4/16
+#     - [-1, 9, C2f, [512, True]]
+#     - [-1, 1, Conv, [1024, 3, 2]] # 7-P5/32
+#     - [-1, 3, C2f, [1024, True]]
+#     - [-1, 1, SPPF, [1024, 5]] # 9
+
+#     - [-4, 1, Conv, [64, 6, 2, 2]] # 10
+#     - [-1, 1, Conv, [128, 3, 2]] # 11
+#     - [-1, 3, C2f, [128, True]] # 12
+#     - [-1, 1, Conv, [256, 3, 2]] # 13
+#     - [-1, 6, C2f, [256, True]] # 14
+#     - [-1, 1, Conv, [512, 3, 2]] # 15
+#     - [-1, 9, C2f, [512, True]] # 16
+#     - [-1, 1, Conv, [1024, 3, 2]] # 17
+#     - [-1, 3, C2f, [1024, True]] # 18
+#     - [-1, 1, SPPF, [1024, 5]] # 19
+
+
+#     - [[9, 19], 1, FusionMamba, [1024, 8, 8]] # 20
+#     # - [[9, 20], 1, Add2, [1024, 0]] #21
+#     # - [[19, 20], 1, Add2, [1024, 1]] #22
+#     - [[-1, 9, 19], 1, FourInputFusionBlock,  [1024]]
+
+
+
+
+# # YOLOv5 v6.0 head
+# head: 
+#     # [[9, 19], 1, Concat, [1]], # 
+#     - [-1, 1, Conv, [512, 1, 1]]  # 
+#     - [-1, 1, nn.Upsample, [None, 2, "nearest"]]  #
+#     - [[-1, 6, 16], 1, Concat, [1]] # 
+#     - [-1, 3, C2f, [512, False]] #
+
+#     - [-1, 1, Conv, [256, 1, 1]] # 
+#     - [-1, 1, nn.Upsample, [None, 2, "nearest"]] # 
+#     - [[-1, 4, 14], 1, Concat, [1]] # cat backbone P3 
+#     - [-1, 3, C2f, [256, False]] #  (P3/8-small) 
+
+#     - [-1, 1, Conv, [256, 3, 2]] # 
+#     # [[-1, 25], 1, Concat, [1]], # cat head P4 
+#     - [[-1, 26], 1, Concat, [1]] # cat head P4 
+#     - [-1, 3, C2f, [512, False]] #  (P4/16-medium) 
+
+#     - [-1, 1, Conv, [512, 3, 2]] # 
+#     - [[-1, 21], 1, Concat, [1]] # cat head P5 
+#     - [-1, 3, C2f, [1024, False]] # (P5/32-large) # 
+
+#     - [[29, 32, 35], 1, Detect, [nc]] # Detect(P3, P4, P5)
+  
+
+# Ultralytics YOLO 🚀, AGPL-3.0
+# LoME × COMO (shared backbone, P5 FusionMamba + FourInputFusionBlock, OBB head)
+
+# Parameters
+nc: 80
+scales:
+  n: [0.33, 0.50, 1024]
+  s: [0.33, 0.50, 1024]
+  m: [0.67, 0.75, 768]
+  l: [1.00, 1.00, 512]
+  x: [1.00, 1.25, 512]
+
+# Backbone (LoME 共享权重双模态，模块需支持 tuple 输入并各自处理)
+backbone:
+  # [from, repeats, module, args]
+  - [[-1, -1], 1, Conv_adalora_sym_m, [64, 3, 2, 9, 9, 0.]]   # 0  P1/2  (rgb, ir)
+  - [-1, 1,     Conv_adalora_sym_m,   [128, 3, 2, 9, 9, 0.]]  # 1  P2/4
+  - [-1, 3,     C2f_adalora_sym_m,    [128, True, 9, 9, 0.]]  # 2
+  - [-1, 1,     Conv_adalora_sym_m,   [256, 3, 2, 9, 9, 0.]]  # 3  P3/8
+  - [-1, 6,     C2f_adalora_sym_m,    [256, True, 9, 9, 0.]]  # 4
+  - [-1, 1,     Conv_adalora_sym_m,   [512, 3, 2, 9, 9, 0.]]  # 5  P4/16
+  - [-1, 6,     C2f_adalora_sym_m,    [512, True, 9, 9, 0.]]  # 6
+  - [-1, 1,     Conv_adalora_sym_m,   [1024, 3, 2, 9, 9, 0.]] # 7  P5/32
+  - [-1, 3,     C2f_adalora_sym_m,    [1024, True, 9, 9, 0.]] # 8
+  - [-1, 1,     SPPF_adalora_sym_m,   [1024, 5, 9, 9, 0.]]    # 9  (注意：应输出 (x_rgb, x_ir))
+
+  # P3/P4 轻量融合保持 Add（模块内部从 tuple 拆两路并求和/线性融合）
+  - [4, 1, Add, [256]]    # 10  P3 fused
+  - [6, 1, Add, [512]]    # 11  P4 fused
+
+  # P5 融合改为 FusionMamba + FourInputFusionBlock
+  # 说明：FusionMamba/四输入块需要支持 tuple/list 输入（从 9 拆出 rgb/ir），不要写 [[9, 9]]！
+  - [[9], 1, FusionMamba, [1024, 8, 8]]         # 12  P5 融合（长程/时序样式）
+  - [[-1, 9], 1, FourInputFusionBlock, [1024]] # 13  用融合结果 + (rgb, ir) 做重整/互补
+
+# Head (与 LoME 头一致，只是 P5 用 13)
+head:
+  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]   # 14  P5->P4
+  - [[-1, 11], 1, Concat, [1]]                   # 15  拼 P4 fused
+  - [-1, 3, C2f, [512]]                          # 16
+
+  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]   # 17  P4->P3
+  - [[-1, 10], 1, Concat, [1]]                   # 18  拼 P3 fused
+  - [-1, 3, C2f, [256]]                          # 19  (P3)
+
+  - [-1, 1, Conv, [256, 3, 2]]                   # 20  P3->P4
+  - [[-1, 16], 1, Concat, [1]]                   # 21
+  - [-1, 3, C2f, [512]]                          # 22  (P4)
+
+  - [-1, 1, Conv, [512, 3, 2]]                   # 23  P4->P5
+  - [[-1, 13], 1, Concat, [1]]                   # 24  拼 P5 融合重整后的特征
+  - [-1, 3, C2f, [1024]]                         # 25  (P5)
+
+  - [[19, 22, 25], 1, OBB, [nc, 1]]              # 26  OBB(P3, P4, P5)

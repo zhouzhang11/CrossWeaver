@@ -1,0 +1,18 @@
+path: /home/data1/yanght/VEDAI/
+train_rgb: train_ir.txt
+val_rgb: val_ir.txt
+test_rgb: test_ir.txt
+
+train_ir: train_rgb.txt
+val_ir: val_rgb.txt
+test_ir: test_rgb.txt
+
+names:
+  0: plane
+  1: boat
+  2: camping car
+  3: car
+  4: pick-up
+  5: tractor
+  6: truck
+  7: van

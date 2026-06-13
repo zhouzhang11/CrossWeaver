@@ -1,0 +1,381 @@
+# # Ultralytics YOLO 🚀, AGPL-3.0
+# # 同质/异质特征分离架构
+
+# nc: 80
+# scales:
+#   n: [0.33, 0.50, 1024]
+#   s: [0.33, 0.50, 1024]
+#   m: [0.67, 0.75, 768]
+#   l: [1.00, 1.00, 512]
+#   x: [1.00, 1.25, 512]
+
+# backbone:
+#   # ========== 先验提取模块 ==========
+#   - [[-1, -1], 1, PriorExtractor_Multi, [256, 512, 1024, 0.05, 5]]  # 0-prior (c3, c4, c5, sigma, window_size)
+  
+#   # ========== 同质特征提取路径 ==========
+#   - [[-1, -1], 1, Conv_adalora_sym_m_homo, [64, 3, 2, 9, 9, 0.]]   # 1-homo  P1/2
+#   - [-1, 1, Conv_adalora_sym_m_homo, [128, 3, 2, 9, 9, 0.]]        # 2-homo  P2/4
+#   - [-1, 3, C2f_adalora_sym_m_homo, [128, True, 9, 9, 0.]]         # 3-homo
+#   - [-1, 1, Conv_adalora_sym_m_homo, [256, 3, 2, 9, 9, 0.]]        # 4-homo  P3/8
+#   - [-1, 6, C2f_adalora_sym_m_homo, [256, True, 9, 9, 0.]]         # 5-homo  ← P3 同质特征
+#   - [-1, 1, Conv_adalora_sym_m_homo, [512, 3, 2, 9, 9, 0.]]        # 6-homo  P4/16
+#   - [-1, 6, C2f_adalora_sym_m_homo, [512, True, 9, 9, 0.]]         # 7-homo  ← P4 同质特征
+#   - [-1, 1, Conv_adalora_sym_m_homo, [1024, 3, 2, 9, 9, 0.]]       # 8-homo  P5/32
+#   - [-1, 3, C2f_adalora_sym_m_homo, [1024, True, 9, 9, 0.]]        # 9-homo
+#   - [-1, 1, SPPF_adalora_sym_m_homo, [1024, 5, 9, 9, 0.]]          # 10-homo ← P5 同质特征
+
+#   # ========== 异质特征提取路径 + 先验注入 ==========
+#   - [[-1, -1], 1, Conv_adalora_sym_m_het, [64, 3, 2, 9, 9, 0.]]    # 11-het  P1/2
+#   - [-1, 1, Conv_adalora_sym_m_het, [128, 3, 2, 9, 9, 0.]]         # 12-het  P2/4
+#   - [-1, 3, C2f_adalora_sym_m_het, [128, True, 9, 9, 0.]]          # 13-het
+#   - [-1, 1, Conv_adalora_sym_m_het, [256, 3, 2, 9, 9, 0.]]         # 14-het  P3/8
+#   - [-1, 6, C2f_adalora_sym_m_het, [256, True, 9, 9, 0.]]          # 15-het  P3 异质特征原始 (tuple)
+#   - [[15, 0], 1, Add_Prior, [256, 0]]                              # 16-het  ← P3 异质特征增强 (注入P3先验)
+#   - [-1, 1, Conv_adalora_sym_m_het, [512, 3, 2, 9, 9, 0.]]         # 17-het  P4/16
+#   - [-1, 6, C2f_adalora_sym_m_het, [512, True, 9, 9, 0.]]          # 18-het  P4 异质特征原始 (tuple)
+#   - [[18, 0], 1, Add_Prior, [512, 1]]                              # 19-het  ← P4 异质特征增强 (注入P4先验)
+#   - [-1, 1, Conv_adalora_sym_m_het, [1024, 3, 2, 9, 9, 0.]]        # 20-het  P5/32
+#   - [-1, 3, C2f_adalora_sym_m_het, [1024, True, 9, 9, 0.]]         # 21-het
+#   - [-1, 1, SPPF_adalora_sym_m_het, [1024, 5, 9, 9, 0.]]           # 22-het  P5 异质特征原始 (tuple)
+#   - [[22, 0], 1, Add_Prior, [1024, 2]]                             # 23-het  ← P5 异质特征增强 (注入P5先验)
+
+#   # ========== P5 同质特征融合 ==========
+#   - [[10], 1, FusionMamba, [1024, 8, 8]]                           # 24  输入: (F_Homo_RGB_P5, F_Homo_IR_P5)
+#   - [[-1, 10], 1, FourInputFusionBlock, [1024]]                    # 25  输出: 单个融合特征
+
+# head:
+#   # ========== FPN: 自顶向下 + DCN 对齐 ==========
+  
+#   # --- P5 → P4 ---
+#   - [25, 1, nn.Upsample, [None, 2, "nearest"]]                     # 26  Up_P5 (共享)
+#   - [[7], 1, DCN_Offset_Conv, [512]]                               # 27  学习 Offset_P4 (输入: P4 同质 tuple)
+#   - [[7, 27], 1, DCN_Warp_IR, [512]]                               # 28  Warped_IR_P4 (从 tuple 取 IR, 用正 offset)
+#   - [[7, 27], 1, DCN_Warp_RGB, [512]]                              # 29  Warped_RGB_P4 (从 tuple 取 RGB, 用负 offset)
+#   - [[26, 28, 7], 1, Concat_RGB, [1]]                              # 30  拼接 RGB 侧 (从 tuple 取 RGB)
+#   - [-1, 3, C2f, [512]]                                            # 31  FPN_P4_RGB
+#   - [[26, 29, 7], 1, Concat_IR, [1]]                               # 32  拼接 IR 侧 (从 tuple 取 IR)
+#   - [-1, 3, C2f, [512]]                                            # 33  FPN_P4_IR
+  
+#   # --- P4 → P3 ---
+#   - [31, 1, nn.Upsample, [None, 2, "nearest"]]                     # 34  Up_P4_RGB
+#   - [33, 1, nn.Upsample, [None, 2, "nearest"]]                     # 35  Up_P4_IR
+#   - [[5], 1, DCN_Offset_Conv, [256]]                               # 36  学习 Offset_P3
+#   - [[5, 36], 1, DCN_Warp_IR, [256]]                               # 37  Warped_IR_P3
+#   - [[5, 36], 1, DCN_Warp_RGB, [256]]                              # 38  Warped_RGB_P3
+#   - [[34, 37, 5], 1, Concat_RGB, [1]]                              # 39  拼接 RGB 侧
+#   - [-1, 3, C2f, [256]]                                            # 40  FPN_P3_RGB
+#   - [[35, 38, 5], 1, Concat_IR, [1]]                               # 41  拼接 IR 侧
+#   - [-1, 3, C2f, [256]]                                            # 42  FPN_P3_IR
+
+#   # ========== PAN: 自底向上 + 异质特征注入 ==========
+  
+#   # --- P3 级别: 注入异质特征 ---
+#   - [[40, 16], 1, Add_RGB, [256]]                                  # 43  PAN_P3_in_RGB = FPN_P3_RGB + F_Het_RGB_P3增强
+#   - [[42, 16], 1, Add_IR, [256]]                                   # 44  PAN_P3_in_IR = FPN_P3_IR + F_Het_IR_P3增强
+  
+#   # --- P3 → P4 ---
+#   - [43, 1, Conv, [256, 3, 2]]                                     # 45  Down_P3_RGB
+#   - [44, 1, Conv, [256, 3, 2]]                                     # 46  Down_P3_IR
+#   - [[31, 19], 1, Add_RGB, [512]]                                  # 47  FPN_P4_RGB + F_Het_RGB_P4增强
+#   - [[33, 19], 1, Add_IR, [512]]                                   # 48  FPN_P4_IR + F_Het_IR_P4增强
+#   - [[45, 47], 1, Concat, [1]]                                     # 49  拼接 RGB 侧
+#   - [-1, 3, C2f, [512]]                                            # 50  PAN_P4_RGB
+#   - [[46, 48], 1, Concat, [1]]                                     # 51  拼接 IR 侧
+#   - [-1, 3, C2f, [512]]                                            # 52  PAN_P4_IR
+  
+#   # --- P4 → P5 ---
+#   - [50, 1, Conv, [512, 3, 2]]                                     # 53  Down_P4_RGB
+#   - [52, 1, Conv, [512, 3, 2]]                                     # 54  Down_P4_IR
+#   - [[25, 23], 1, Add_RGB, [1024]]                                 # 55  FPN_P5 + F_Het_RGB_P5增强
+#   - [[25, 23], 1, Add_IR, [1024]]                                  # 56  FPN_P5 + F_Het_IR_P5增强
+#   - [[53, 55], 1, Concat, [1]]                                     # 57  拼接 RGB 侧
+#   - [-1, 3, C2f, [1024]]                                           # 58  PAN_P5_RGB
+#   - [[54, 56], 1, Concat, [1]]                                     # 59  拼接 IR 侧
+#   - [-1, 3, C2f, [1024]]                                           # 60  PAN_P5_IR
+
+#   # ========== 双路检测头 ==========
+#   - [[43, 50, 58], 1, OBB, [nc, 1]]                                # 61  OBB_Head_RGB
+#   - [[44, 52, 60], 1, OBB, [nc, 1]]                                # 62  OBB_Head_IR
+# Ultralytics YOLO 🚀, AGPL-3.0
+# 同质/异质特征分离架构
+
+# nc: 80
+# scales:
+#   n: [0.33, 0.50, 1024]
+#   s: [0.33, 0.50, 1024]
+#   m: [0.67, 0.75, 768]
+#   l: [1.00, 1.00, 512]
+#   x: [1.00, 1.25, 512]
+
+# backbone:
+#   # ========== 先验提取模块 ==========
+#   - [[-1, -1], 1, PriorExtractor_Multi, [256, 512, 1024, 0.05, 5]]  # 0-prior (c3, c4, c5, sigma, window_size)
+  
+#   # ========== 同质特征提取路径 ==========
+#   - [[-1, -1], 1, Conv_adalora_sym_m_homo, [64, 3, 2, 9, 9, 0.]]   # 1-homo  P1/2
+#   - [-1, 1, Conv_adalora_sym_m_homo, [128, 3, 2, 9, 9, 0.]]        # 2-homo  P2/4
+#   - [-1, 3, C2f_adalora_sym_m_homo, [128, True, 9, 9, 0.]]         # 3-homo
+#   - [-1, 1, Conv_adalora_sym_m_homo, [256, 3, 2, 9, 9, 0.]]        # 4-homo  P3/8
+#   - [-1, 6, C2f_adalora_sym_m_homo, [256, True, 9, 9, 0.]]         # 5-homo  ← P3 同质特征
+#   - [-1, 1, Conv_adalora_sym_m_homo, [512, 3, 2, 9, 9, 0.]]        # 6-homo  P4/16
+#   - [-1, 6, C2f_adalora_sym_m_homo, [512, True, 9, 9, 0.]]         # 7-homo  ← P4 同质特征
+#   - [-1, 1, Conv_adalora_sym_m_homo, [1024, 3, 2, 9, 9, 0.]]       # 8-homo  P5/32
+#   - [-1, 3, C2f_adalora_sym_m_homo, [1024, True, 9, 9, 0.]]        # 9-homo
+#   - [-1, 1, SPPF_adalora_sym_m_homo, [1024, 5, 9, 9, 0.]]          # 10-homo ← P5 同质特征
+
+#   # ========== 异质特征提取路径 + 先验注入 ==========
+#   - [[-1, -1], 1, Conv_adalora_sym_m_het, [64, 3, 2, 9, 9, 0.]]    # 11-het  P1/2
+#   - [-1, 1, Conv_adalora_sym_m_het, [128, 3, 2, 9, 9, 0.]]         # 12-het  P2/4
+#   - [-1, 3, C2f_adalora_sym_m_het, [128, True, 9, 9, 0.]]          # 13-het
+#   - [-1, 1, Conv_adalora_sym_m_het, [256, 3, 2, 9, 9, 0.]]         # 14-het  P3/8
+#   - [[-1, 0], 1, Add_Prior, [256, 0]]                              # 15-het  ← P3 异质特征增强 (注入P3先验)
+#   - [-1, 6, C2f_adalora_sym_m_het, [256, True, 9, 9, 0.]]          # 16-het  P3 异质特征原始 (tuple)
+
+#   - [-1, 1, Conv_adalora_sym_m_het, [512, 3, 2, 9, 9, 0.]]         # 17-het  P4/16
+#   - [[-1, 0], 1, Add_Prior, [512, 1]]                              # 18-het  ← P4 异质特征增强 (注入P4先验)
+#   - [-1, 6, C2f_adalora_sym_m_het, [512, True, 9, 9, 0.]]          # 19-het  P4 异质特征原始 (tuple)
+  
+#   - [-1, 1, Conv_adalora_sym_m_het, [1024, 3, 2, 9, 9, 0.]]        # 20-het  P5/32
+#   - [[-1, 0], 1, Add_Prior, [1024, 2]]                             # 21-het  ← P5 异质特征增强 (注入P5先验)
+#   - [-1, 3, C2f_adalora_sym_m_het, [1024, True, 9, 9, 0.]]         # 21-het
+#   - [-1, 1, SPPF_adalora_sym_m_het, [1024, 5, 9, 9, 0.]]           # 23-het  P5 异质特征原始 (tuple)
+
+
+#   # ========== P5 同质特征融合 ==========
+#   - [[10], 1, FusionMamba, [1024, 8, 8]]                           # 24  输入: (F_Homo_RGB_P5, F_Homo_IR_P5)
+#   - [[-1, 10], 1, FourInputFusionBlock, [1024]]                    # 25  输出: 单个融合特征
+
+# head:
+#   # ========== FPN: 自顶向下 + DCN 对齐 ==========
+  
+#   # --- P5 → P4 ---
+#   - [25, 1, nn.Upsample, [None, 2, "nearest"]]                     # 26  Up_P5 (共享)
+#   - [[7], 1, DCN_Offset_Conv, [512]]                               # 27  学习 Offset_P4 (输入: P4 同质 tuple)
+#   - [[7, 27], 1, DCN_Warp_IR, [512]]                               # 28  Warped_IR_P4 (从 tuple 取 IR, 用正 offset)
+#   - [[7, 27], 1, DCN_Warp_RGB, [512]]                              # 29  Warped_RGB_P4 (从 tuple 取 RGB, 用负 offset)
+#   - [[26, 28, 7], 1, Concat_RGB, [1]]                              # 30  拼接 RGB 侧 (从 tuple 取 RGB)
+#   - [-1, 3, C2f, [512]]                                            # 31  FPN_P4_RGB
+#   - [[26, 29, 7], 1, Concat_IR, [1]]                               # 32  拼接 IR 侧 (从 tuple 取 IR)
+#   - [-1, 3, C2f, [512]]                                            # 33  FPN_P4_IR
+  
+#   # --- P4 → P3 ---
+#   - [31, 1, nn.Upsample, [None, 2, "nearest"]]                     # 34  Up_P4_RGB
+#   - [33, 1, nn.Upsample, [None, 2, "nearest"]]                     # 35  Up_P4_IR
+#   - [[5], 1, DCN_Offset_Conv, [256]]                               # 36  学习 Offset_P3
+#   - [[5, 36], 1, DCN_Warp_IR, [256]]                               # 37  Warped_IR_P3
+#   - [[5, 36], 1, DCN_Warp_RGB, [256]]                              # 38  Warped_RGB_P3
+#   - [[34, 37, 5], 1, Concat_RGB, [1]]                              # 39  拼接 RGB 侧
+#   - [-1, 3, C2f, [256]]                                            # 40  FPN_P3_RGB
+#   - [[35, 38, 5], 1, Concat_IR, [1]]                               # 41  拼接 IR 侧
+#   - [-1, 3, C2f, [256]]                                            # 42  FPN_P3_IR
+
+#   # ========== PAN: 自底向上 + 异质特征注入 ==========
+  
+#   # --- P3 级别: 注入异质特征 ---
+#   - [[40, 16], 1, Add_RGB, [256]]                                  # 43  PAN_P3_in_RGB = FPN_P3_RGB + F_Het_RGB_P3增强
+#   - [[42, 16], 1, Add_IR, [256]]                                   # 44  PAN_P3_in_IR = FPN_P3_IR + F_Het_IR_P3增强
+  
+#   # --- P3 → P4 ---
+#   - [43, 1, Conv, [256, 3, 2]]                                     # 45  Down_P3_RGB
+#   - [44, 1, Conv, [256, 3, 2]]                                     # 46  Down_P3_IR
+#   - [[31, 19], 1, Add_RGB, [512]]                                  # 47  FPN_P4_RGB + F_Het_RGB_P4增强
+#   - [[33, 19], 1, Add_IR, [512]]                                   # 48  FPN_P4_IR + F_Het_IR_P4增强
+#   - [[45, 47], 1, Concat, [1]]                                     # 49  拼接 RGB 侧
+#   - [-1, 3, C2f, [512]]                                            # 50  PAN_P4_RGB
+#   - [[46, 48], 1, Concat, [1]]                                     # 51  拼接 IR 侧
+#   - [-1, 3, C2f, [512]]                                            # 52  PAN_P4_IR
+  
+#   # --- P4 → P5 ---
+#   - [50, 1, Conv, [512, 3, 2]]                                     # 53  Down_P4_RGB
+#   - [52, 1, Conv, [512, 3, 2]]                                     # 54  Down_P4_IR
+#   - [[25, 23], 1, Add_RGB, [1024]]                                 # 55  FPN_P5 + F_Het_RGB_P5增强
+#   - [[25, 23], 1, Add_IR, [1024]]                                  # 56  FPN_P5 + F_Het_IR_P5增强
+#   - [[53, 55], 1, Concat, [1]]                                     # 57  拼接 RGB 侧
+#   - [-1, 3, C2f, [1024]]                                           # 58  PAN_P5_RGB
+#   - [[54, 56], 1, Concat, [1]]                                     # 59  拼接 IR 侧
+#   - [-1, 3, C2f, [1024]]                                           # 60  PAN_P5_IR
+
+#   # ========== 双路检测头 ==========
+#   - [[43, 50, 58], 1, OBB, [nc, 1]]                                # 61  OBB_Head_RGB
+#   - [[44, 52, 60], 1, OBB, [nc, 1]]                                # 62  OBB_Head_IR
+# # Ultralytics YOLO 🚀, AGPL-3.0
+# # 同质/异质特征分离架构
+
+# nc: 80
+# scales:
+#   n: [0.33, 0.50, 1024]
+#   s: [0.33, 0.50, 1024]
+#   m: [0.67, 0.75, 768]
+#   l: [1.00, 1.00, 512]
+#   x: [1.00, 1.25, 512]
+
+# backbone:
+#   # ========== 先验提取模块 ==========
+#   - [[-1, -1], 1, PriorExtractor_Multi, [256, 512, 1024, 0.05, 5]]  # 0-prior (c3, c4, c5, sigma, window_size)
+  
+#   # ========== 同质特征提取路径 ==========
+#   - [[-1, -1], 1, Conv_adalora_sym_m_homo, [64, 3, 2, 9, 9, 0.]]   # 1-homo  P1/2
+#   - [-1, 1, Conv_adalora_sym_m_homo, [128, 3, 2, 9, 9, 0.]]        # 2-homo  P2/4
+#   - [-1, 3, C2f_adalora_sym_m_homo, [128, True, 9, 9, 0.]]         # 3-homo
+#   - [-1, 1, Conv_adalora_sym_m_homo, [256, 3, 2, 9, 9, 0.]]        # 4-homo  P3/8
+#   - [-1, 6, C2f_adalora_sym_m_homo, [256, True, 9, 9, 0.]]         # 5-homo  ← P3 同质特征
+#   - [-1, 1, Conv_adalora_sym_m_homo, [512, 3, 2, 9, 9, 0.]]        # 6-homo  P4/16
+#   - [-1, 6, C2f_adalora_sym_m_homo, [512, True, 9, 9, 0.]]         # 7-homo  ← P4 同质特征
+#   - [-1, 1, Conv_adalora_sym_m_homo, [1024, 3, 2, 9, 9, 0.]]       # 8-homo  P5/32
+#   - [-1, 3, C2f_adalora_sym_m_homo, [1024, True, 9, 9, 0.]]        # 9-homo
+#   - [-1, 1, SPPF_adalora_sym_m_homo, [1024, 5, 9, 9, 0.]]          # 10-homo ← P5 同质特征
+
+#   # ========== 异质特征提取路径 + 先验注入 ==========
+#   - [[-1, -1], 1, Conv_adalora_sym_m_het, [64, 3, 2, 9, 9, 0.]]    # 11-het  P1/2
+#   - [-1, 1, Conv_adalora_sym_m_het, [128, 3, 2, 9, 9, 0.]]         # 12-het  P2/4
+#   - [-1, 3, C2f_adalora_sym_m_het, [128, True, 9, 9, 0.]]          # 13-het
+#   - [-1, 1, Conv_adalora_sym_m_het, [256, 3, 2, 9, 9, 0.]]         # 14-het  P3/8
+#   - [-1, 6, C2f_adalora_sym_m_het, [256, True, 9, 9, 0.]]          # 15-het  P3 异质特征原始 (tuple)
+#   - [[15, 0], 1, Add_Prior, [256, 0]]                              # 16-het  ← P3 异质特征增强 (注入P3先验)
+#   - [-1, 1, Conv_adalora_sym_m_het, [512, 3, 2, 9, 9, 0.]]         # 17-het  P4/16
+#   - [-1, 6, C2f_adalora_sym_m_het, [512, True, 9, 9, 0.]]          # 18-het  P4 异质特征原始 (tuple)
+#   - [[18, 0], 1, Add_Prior, [512, 1]]                              # 19-het  ← P4 异质特征增强 (注入P4先验)
+#   - [-1, 1, Conv_adalora_sym_m_het, [1024, 3, 2, 9, 9, 0.]]        # 20-het  P5/32
+#   - [-1, 3, C2f_adalora_sym_m_het, [1024, True, 9, 9, 0.]]         # 21-het
+#   - [-1, 1, SPPF_adalora_sym_m_het, [1024, 5, 9, 9, 0.]]           # 22-het  P5 异质特征原始 (tuple)
+#   - [[22, 0], 1, Add_Prior, [1024, 2]]                             # 23-het  ← P5 异质特征增强 (注入P5先验)
+
+#   # ========== P5 同质特征融合 ==========
+#   - [[10], 1, FusionMamba, [1024, 8, 8]]                           # 24  输入: (F_Homo_RGB_P5, F_Homo_IR_P5)
+#   - [[-1, 10], 1, FourInputFusionBlock, [512]]                    # 25  输出: 单个融合特征
+
+# head:
+#   # ========== FPN: 自顶向下 + DCN 对齐 ==========
+  
+#   # --- P5 → P4 ---
+#   - [25, 1, nn.Upsample, [None, 2, "nearest"]]                     # 26  Up_P5 (共享)
+#   - [[7], 1, DCN_Offset_Conv, [512]]                               # 27  学习 Offset_P4 (输入: P4 同质 tuple)
+#   - [[7, 27], 1, DCN_Warp_IR, [512]]                               # 28  Warped_IR_P4 (从 tuple 取 IR, 用正 offset)
+#   - [[26, 28, 7], 1, Concat_RGB, [1]]                              # 29  拼接 RGB 侧 (从 tuple 取 RGB)
+#   - [-1, 3, C2f, [512]]                                            # 30  FPN_P4_RGB
+
+  
+#   # --- P4 → P3 ---
+#   - [30, 1, nn.Upsample, [None, 2, "nearest"]]                     # 31  Up_P4_RGB
+#   - [[5], 1, DCN_Offset_Conv, [256]]                               # 32  学习 Offset_P3
+#   - [[5, 32], 1, DCN_Warp_IR, [256]]                               # 33  Warped_IR_P3
+#   - [[31, 33, 5], 1, Concat_RGB, [1]]                              # 34  拼接 RGB 侧
+#   - [-1, 3, C2f, [256]]                                            # 35  FPN_P3_RGB
+
+#   # ========== PAN: 自底向上 + 异质特征注入 ==========
+  
+#   # --- P3 级别: 注入异质特征 ---
+#   - [[-1, 16], 1, Add_RGB, [256]]                                  # 36  PAN_P3_in_RGB = FPN_P3_RGB + F_Het_RGB_P3增强
+#   - [[-1, 16], 1, Add_IR, [256]]                                   # 37  PAN_P3_in_IR = FPN_P3_IR + F_Het_IR_P3增强
+  
+#   # --- P3 → P4 ---
+#   - [-1, 1, Conv, [256, 3, 2]]                                     # 38  Down_P3_RGB
+#   - [[30, 19], 1, Add_RGB, [512]]                                  # 39  FPN_P4_RGB + F_Het_RGB_P4增强
+#   - [[-1, 19], 1, Add_IR, [512]]                                   # 40  FPN_P4_IR + F_Het_IR_P4增强
+#   - [[38, 40], 1, Concat, [1]]                                     # 41  拼接 RGB 侧
+#   - [-1, 3, C2f, [512]]                                            # 42  PAN_P4_RGB
+
+  
+#   # --- P4 → P5 ---
+#   - [42, 1, Conv, [512, 3, 2]]                                     # 43  Down_P4_RGB
+#   - [[25, 23], 1, Add_RGB, [1024]]                                 # 44  FPN_P5 + F_Het_RGB_P5增强
+#   - [[-1, 23], 1, Add_IR, [1024]]                                  # 45  FPN_P5 + F_Het_IR_P5增强
+#   - [[43, 45], 1, Concat, [1]]                                     # 46  拼接 RGB 侧
+#   - [-1, 3, C2f, [1024]]                                           # 47  PAN_P5_RGB
+
+
+#   # ========== 双路检测头 ==========
+#   - [[37, 42, 47], 1, OBB, [nc, 1]]                                # 61  OBB_Head_RGB
+# Ultralytics YOLO 🚀, AGPL-3.0
+# 同质/异质特征分离架构
+
+nc: 6
+scales:
+  n: [0.33, 0.50, 1024]
+  # n: [0.67, 0.75, 768]
+  s: [0.33, 0.50, 1024]
+  m: [0.67, 0.75, 768]
+  l: [1.00, 1.00, 512]
+  x: [1.00, 1.25, 512]
+
+backbone:
+  # ========== 先验提取模块 ==========
+  - [[-1, -1], 1, PriorExtractor_Multi, [256, 512, 1024, 0.05, 5]]  # 0-prior (c3, c4, c5, sigma, window_size)
+  
+  # ========== 同质特征提取路径 ==========
+  - [[-1, -1], 1, Conv_adalora_sym_m_homo, [64, 3, 2, 9, 9, 0.]]   # 1-homo  P1/2
+  - [-1, 1, Conv_adalora_sym_m_homo, [128, 3, 2, 9, 9, 0.]]        # 2-homo  P2/4
+  - [-1, 3, C2f_adalora_sym_m_homo, [128, True, 9, 9, 0.]]         # 3-homo
+  - [-1, 1, Conv_adalora_sym_m_homo, [256, 3, 2, 9, 9, 0.]]        # 4-homo  P3/8
+  - [-1, 6, C2f_adalora_sym_m_homo, [256, True, 9, 9, 0.]]         # 5-homo  ← P3 同质特征
+  - [-1, 1, Conv_adalora_sym_m_homo, [512, 3, 2, 9, 9, 0.]]        # 6-homo  P4/16
+  - [-1, 6, C2f_adalora_sym_m_homo, [512, True, 9, 9, 0.]]         # 7-homo  ← P4 同质特征
+  - [-1, 1, Conv_adalora_sym_m_homo, [1024, 3, 2, 9, 9, 0.]]       # 8-homo  P5/32
+  - [-1, 3, C2f_adalora_sym_m_homo, [1024, True, 9, 9, 0.]]        # 9-homo
+  - [-1, 1, SPPF_adalora_sym_m_homo, [1024, 5, 9, 9, 0.]]          # 10-homo ← P5 同质特征
+
+  # ========== 异质特征提取路径 + 先验注入 ==========
+  - [[-1, -1], 1, Conv_adalora_sym_m_het, [64, 3, 2, 9, 9, 0.]]    # 11-het  P1/2
+  - [-1, 1, Conv_adalora_sym_m_het, [128, 3, 2, 9, 9, 0.]]         # 12-het  P2/4
+  - [-1, 3, C2f_adalora_sym_m_het, [128, True, 9, 9, 0.]]          # 13-het
+  - [-1, 1, Conv_adalora_sym_m_het, [256, 3, 2, 9, 9, 0.]]         # 14-het  P3/8
+  - [-1, 6, C2f_adalora_sym_m_het, [256, True, 9, 9, 0.]]          # 15-het  P3 异质特征原始 (tuple)
+  - [[15, 0], 1, Add_Prior, [256, 0]]                              # 16-het  ← P3 异质特征增强 (注入P3先验)
+  - [-1, 1, Conv_adalora_sym_m_het, [512, 3, 2, 9, 9, 0.]]         # 17-het  P4/16
+  - [-1, 6, C2f_adalora_sym_m_het, [512, True, 9, 9, 0.]]          # 18-het  P4 异质特征原始 (tuple)
+  - [[18, 0], 1, Add_Prior, [512, 1]]                              # 19-het  ← P4 异质特征增强 (注入P4先验)
+  - [-1, 1, Conv_adalora_sym_m_het, [1024, 3, 2, 9, 9, 0.]]        # 20-het  P5/32
+  - [-1, 3, C2f_adalora_sym_m_het, [1024, True, 9, 9, 0.]]         # 21-het
+  - [-1, 1, SPPF_adalora_sym_m_het, [1024, 5, 9, 9, 0.]]           # 22-het  P5 异质特征原始 (tuple)
+  - [[22, 0], 1, Add_Prior, [1024, 2]]                             # 23-het  ← P5 异质特征增强 (注入P5先验)
+
+  # ========== P5 同质特征融合 ==========
+  - [[10], 1, FusionMamba, [1024, 8, 8]]                           # 24  输入: (F_Homo_RGB_P5, F_Homo_IR_P5)
+  - [[-1, 10], 1, FourInputFusionBlock, [512]]                    # 25  输出: 单个融合特征
+
+head:
+  # ========== FPN: 自顶向下 + DCN 对齐 ==========
+  
+  # --- P5 → P4 ---
+  - [25, 1, nn.Upsample, [None, 2, "nearest"]]                     # 26  Up_P5 (共享)
+  - [[7], 1, DCN_Offset_Conv, [512]]                               # 27  学习 Offset_P4 (输入: P4 同质 tuple)
+  - [[7, 27], 1, DCN_Warp_RGB, [512]]                               # 28  Warped_IR_P4 (从 tuple 取 IR, 用正 offset)
+  - [[26, 28, 7], 1, Concat_IR, [1]]                              # 29  拼接 RGB 侧 (从 tuple 取 RGB)
+  - [-1, 3, C2f, [512]]                                            # 30  FPN_P4_RGB
+
+  
+  # --- P4 → P3 ---
+  - [30, 1, nn.Upsample, [None, 2, "nearest"]]                     # 31  Up_P4_RGB
+  - [[5], 1, DCN_Offset_Conv, [256]]                               # 32  学习 Offset_P3
+  - [[5, 32], 1, DCN_Warp_RGB, [256]]                               # 33  Warped_IR_P3
+  - [[31, 33, 5], 1, Concat_IR, [1]]                              # 34  拼接 RGB 侧
+
+  - [[16], 1, DCN_Offset_Conv, [256]]                               # 35  
+  - [[16, 35], 1, DCN_Warp_RGB, [256]]                               # 36  
+  - [[34, 36, 16], 1, Concat_IR,[1]]                              # 37
+  - [-1, 3, C2f, [256]]                                            # 38  FPN_P3_RGB
+
+  # ========== PAN: 自底向上 + 异质特征注入 ==========
+  
+  # --- P3 级别: 注入异质特征 ---
+  
+  
+  # --- P3 → P4 ---
+  - [-1, 1, Conv, [256, 3, 2]]                                     # 39  Down_P3_RGB
+  - [[19], 1, DCN_Offset_Conv, [512]]                              # 40
+  - [[19, 40], 1, DCN_Warp_RGB, [512]]                              # 41 
+  - [[39, 41, 19], 1, Concat_IR, [1]]                                 # 42  拼接 RGB 侧
+  - [-1, 3, C2f, [512]]                                            # 43  PAN_P4_RGB
+
+  
+  # --- P4 → P5 ---
+  - [-1, 1, Conv, [512, 3, 2]]                                     # 44  Down_P4_RGB
+  - [[25, 23], 1, Add_RGB, [1024]]                                 # 45  FPN_P5 + F_Het_RGB_P5增强
+  - [[-1, 23], 1, Add_IR, [1024]]                                  # 46  FPN_P5 + F_Het_IR_P5增强
+  - [[44, 46], 1, Concat_RGB, [1]]                                     # 47  拼接 RGB 侧
+  - [-1, 3, C2f, [1024]]                                           # 48  PAN_P5_RGB
+
+
+  # ========== 双路检测头 ==========
+  - [[38, 43, 48], 1, Detect, [nc]]                                # 49  OBB_Head_RGB

@@ -1,0 +1,43 @@
+# Datasets
+DroneVehicle/
+M3FD/
+DVTOD/
+VEDAI/
+drone_vehicle_groundtruth/
+
+# Ablation & experiments
+Ablation/
+PLOT/
+runs/
+
+# Model weights
+*.pt
+*.pth
+*.onnx
+*.tflite
+*.engine
+*.torchscript
+
+# Logs
+*.txt
+!requirements.txt
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Misc
+new/
+.DS_Store
