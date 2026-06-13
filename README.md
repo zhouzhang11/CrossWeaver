@@ -9,13 +9,7 @@ This is the official PyTorch implementation of the CVPR 2026 Findings paper **"C
 
 ## 📢 News / Updates
 * **[2026-04-01]** Our paper has been accepted to **CVPR 2026 Findings**!
-* **[2026-04-01]** Created the repository. The source code and pre-trained models will be released soon.
 
-## 🛠️ TODO List
-- [x] Initial repository setup.
-- [ ] Release core network architecture code (`models/CrossWeaver.py`).
-- [ ] Release training scripts and dataloaders for the DroneVehicle dataset.
-- [ ] Provide evaluation instructions.
 
 ## 📖 Abstract
 While single-modal object detection has made significant progress, real-world perception increasingly depends on multimodal data to capture richer visual cues. However, multimodal object detection under weak spatial alignment remains challenging. In this work, we revisit the problem from two key perspectives: (1) quantization error caused by misaligned multimodal fusion, and (2) balancing modality similarity and complementarity for robust feature integration. Building upon these insights, we propose a novel Cross-Modal Semantic Weaving Network (CrossWeaver) for weakly aligned multimodal object detection. Specifically, we design the Modality-Contrastive Shared Encoder (MCSE) to extract shared semantic representations across modalities under contrastive supervision. Then, we propose the Modality-Conditioned Deformation Adapter (MCDA) to dynamically modulate spatial sampling fields for adaptive geometric transformations and inject lightweight modality-specific priors. Finally, the Cross-Hierarchical Synergistic Network (CHSN) establishes bidirectional interactions between shared semantic and modality-aware features to mitigate quantization errors induced by weak alignment. Extensive experiments show that CrossWeaver achieves state-of-the-art performance on weakly aligned multimodal object detection benchmarks. Our method achieves the $\text{mAP}_{50}$ of 86.8% on DroneVehicle dataset.
@@ -23,8 +17,13 @@ While single-modal object detection has made significant progress, real-world pe
 ## 🚀 Usage (Coming Soon)
 Detailed instructions for environment setup, data preparation, training, and evaluation will be provided here once the code is public.
 
+## 🙏 Acknowledgements
+
+The code is based on YOLOv8 of [Ultralytics](https://github.com/ultralytics/ultralytics). We thank the authors of [LoME](https://github.com/zyszxhy/LoME) and [COMO](https://github.com/luluyuu/COMO) for their prior work that inspired this project.
+
 ## 🔗 Citation
 If you find our work or this code useful in your research, please consider citing our paper:
+
 
 ```bibtex
 @inproceedings{yang2026crossweaver,
@@ -34,6 +33,3 @@ If you find our work or this code useful in your research, please consider citin
   year      = {2026}
 }
 
-## 🙏 Acknowledgements
-
-The code is based on YOLOv8 of [Ultralytics](https://github.com/ultralytics/ultralytics). We thank the authors of [LoME](https://github.com/zyszxhy/LoME) and [COMO](https://github.com/luluyuu/COMO) for their prior work that inspired this project.
